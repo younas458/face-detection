@@ -1,0 +1,482 @@
+<!doctype html>
+<html lang="en"> 
+ <head> 
+  <meta charset="UTF-8"> 
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"> 
+  <title>Face Detection App</title> 
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.18.0/dist/tf.min.js"></script> 
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/face-landmarks-detection@0.0.1/dist/face-landmarks-detection.min.js"></script> 
+  <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
+            color: white;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            padding: 30px 0;
+        }
+
+        h1 {
+            font-size: 2.8rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .subtitle {
+            font-size: 1.2rem;
+            opacity: 0.9;
+            max-width: 600px;
+            margin: 0 auto 30px;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        button {
+            background: linear-gradient(to right, #4776E6, #8E54E9);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 50px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        button:active {
+            transform: translateY(1px);
+        }
+
+        button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .file-label {
+            background: linear-gradient(to right, #00b09b, #96c93d);
+            display: inline-block;
+            padding: 12px 25px;
+            border-radius: 50px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .file-label:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .canvas-container {
+            display: flex;
+            justify-content: center;
+            margin: 20px 0;
+        }
+
+        canvas {
+            max-width: 100%;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .results {
+            margin-top: 20px;
+        }
+
+        .results h3 {
+            margin-bottom: 15px;
+            font-size: 1.5rem;
+        }
+
+        .results-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 15px;
+        }
+
+        .result-item {
+            background: rgba(255, 255, 255, 0.15);
+            padding: 15px;
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .result-label {
+            font-weight: 600;
+            color: #ffcc00;
+        }
+
+        .status {
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            margin: 20px 0;
+            background: rgba(255, 255, 255, 0.15);
+            font-weight: 500;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .spinner {
+            border: 5px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 5px solid #ffffff;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 40px;
+            padding: 20px;
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2.2rem;
+            }
+            
+            .controls {
+                justify-content: center;
+            }
+            
+            button, .file-label {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+    </style> 
+ </head> 
+ <body> 
+  <div class="container"> 
+   <header> 
+    <h1>Face Detection App</h1> 
+    <p class="subtitle">Detect faces in real-time using your webcam or upload an image for analysis. This application uses TensorFlow.js for face detection.</p> 
+   </header> 
+   <div class="card"> 
+    <div class="controls"> <button id="startWebcam"> 
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewbox="0 0 16 16"> <path d="M0 5a2 2 0 0 1 2-2h7.5a2 2 0 0 1 1.983 1.738l3.11-1.382A1 1 0 0 1 16 4.269v7.462a1 1 0 0 1-1.406.913l-3.111-1.382A2 2 0 0 1 9.5 13H2a2 2 0 0 1-2-2V5zm11.5 5.175 3.5 1.556V4.269l-3.5 1.556v4.35zM2 4a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h7.5a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1H2z" /> 
+      </svg> Start Webcam </button> <button id="stopWebcam" disabled> 
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewbox="0 0 16 16"> <path d="M10.961 12.365a1.99 1.99 0 0 0 .522-1.103l3.11 1.382A1 1 0 0 0 16 11.731V4.269a1 1 0 0 0-1.406-.913l-3.111 1.382A2 2 0 0 0 9.5 3H4.272l.714 1H9.5a1 1 0 0 1 1 1v6a1 1 0 0 1-.688.948l-1.048.348-.001.001-5.156-5.157L1.928 2.18l-.001-.001-.002-.002-.01-.01-.02-.02a.753.753 0 0 0-.036-.037l-.06-.06a.753.753 0 0 0-.059-.036l-.019-.02-.01-.01-.002-.002-.001-.002L0 1.88l.001.002 1.181 1.182L0 4.475v1.768l2 2V4.269a1 1 0 0 1 .406-.813l3.111-1.382A2 2 0 0 1 6.5 2h3a2 2 0 0 1 1.983 1.738l3.11-1.382a1 1 0 0 1 1.406.913v7.462a1 1 0 0 1-.406.813l-3.111 1.382A2 2 0 0 1 9.5 14H6.479l-5.44-5.44-1.04 1.04L5.48 15l.06.06a.753.753 0 0 0 .036.037l.02.02.01.01.002.002.001.002L7 16l1.88-1.88-.002-.001-5.156-5.157L10.96 12.366z" /> 
+      </svg> Stop Webcam </button> 
+     <input type="file" id="fileInput" class="file-input" accept="image/*"> <label for="fileInput" class="file-label"> 
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewbox="0 0 16 16"> <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z" /> <path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z" /> 
+      </svg> Upload Image </label> 
+    </div> 
+    <div class="status" id="status">
+      Please start the webcam or upload an image to begin face detection. 
+    </div> 
+    <div class="loading" id="loading"> 
+     <div class="spinner"></div> 
+     <p>Loading models and detecting faces...</p> 
+    </div> 
+    <div class="canvas-container"> 
+     <canvas id="canvas"></canvas> 
+    </div> 
+    <div class="results" id="results"> 
+     <h3>Detection Results</h3> 
+     <div class="results-grid" id="resultsGrid"> <!-- Results will be populated here --> 
+     </div> 
+    </div> 
+   </div> 
+   <footer> 
+    <p>Face Detection App using TensorFlow.js | Created with HTML, CSS, and JavaScript</p> 
+   </footer> 
+  </div> 
+  <script>
+        // DOM elements
+        const startWebcamBtn = document.getElementById('startWebcam');
+        const stopWebcamBtn = document.getElementById('stopWebcam');
+        const fileInput = document.getElementById('fileInput');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const statusEl = document.getElementById('status');
+        const loadingEl = document.getElementById('loading');
+        const resultsGrid = document.getElementById('resultsGrid');
+
+        // Variables
+        let model = null;
+        let stream = null;
+        let isDetecting = false;
+        let animationId = null;
+
+        // Initialize the app
+        async function init() {
+            statusEl.textContent = 'Loading face detection model...';
+            loadingEl.style.display = 'block';
+            
+            try {
+                // Load the face detection model
+                model = await faceLandmarksDetection.load(
+                    faceLandmarksDetection.SupportedPackages.mediapipeFacemesh
+                );
+                
+                statusEl.textContent = 'Model loaded successfully! Start webcam or upload an image.';
+                loadingEl.style.display = 'none';
+                startWebcamBtn.disabled = false;
+            } catch (error) {
+                statusEl.textContent = 'Error loading model: ' + error.message;
+                loadingEl.style.display = 'none';
+                console.error(error);
+            }
+        }
+
+        // Start webcam
+        async function startWebcam() {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { width: 640, height: 480 } 
+                });
+                
+                const video = document.createElement('video');
+                video.srcObject = stream;
+                video.play();
+                
+                // Set canvas dimensions to match video
+                video.addEventListener('loadedmetadata', () => {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                });
+                
+                startWebcamBtn.disabled = true;
+                stopWebcamBtn.disabled = false;
+                statusEl.textContent = 'Webcam started. Detecting faces...';
+                
+                // Start detection
+                detectFaces(video);
+            } catch (error) {
+                statusEl.textContent = 'Error accessing webcam: ' + error.message;
+                console.error(error);
+            }
+        }
+
+        // Stop webcam
+        function stopWebcam() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+            }
+            
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+                animationId = null;
+            }
+            
+            isDetecting = false;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            startWebcamBtn.disabled = false;
+            stopWebcamBtn.disabled = true;
+            statusEl.textContent = 'Webcam stopped.';
+            resultsGrid.innerHTML = '';
+        }
+
+        // Detect faces in video stream
+        async function detectFaces(video) {
+            if (!model) return;
+            
+            isDetecting = true;
+            
+            async function detect() {
+                if (!isDetecting) return;
+                
+                const predictions = await model.estimateFaces({
+                    input: video,
+                    returnTensors: false,
+                    flipHorizontal: false,
+                    predictIrises: false
+                });
+                
+                // Clear canvas
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                // Draw video frame
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                
+                // Update results
+                updateResults(predictions);
+                
+                // Draw face bounding boxes and landmarks
+                drawDetections(predictions);
+                
+                // Continue detection
+                animationId = requestAnimationFrame(detect);
+            }
+            
+            detect();
+        }
+
+        // Draw face detections on canvas
+        function drawDetections(predictions) {
+            if (predictions.length > 0) {
+                predictions.forEach(prediction => {
+                    const [x, y, width, height] = prediction.boundingBox;
+                    
+                    // Draw bounding box
+                    ctx.strokeStyle = '#00ff00';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(x, y, width, height);
+                    
+                    // Draw face landmarks
+                    ctx.fillStyle = '#ff0000';
+                    prediction.scaledMesh.forEach(point => {
+                        ctx.fillRect(point[0], point[1], 2, 2);
+                    });
+                    
+                    // Draw probability
+                    ctx.fillStyle = '#00ff00';
+                    ctx.font = '16px Arial';
+                    ctx.fillText(
+                        `Face: ${(prediction.probability[0] * 100).toFixed(1)}%`, 
+                        x, 
+                        y - 5
+                    );
+                });
+            }
+        }
+
+        // Update results display
+        function updateResults(predictions) {
+            resultsGrid.innerHTML = '';
+            
+            if (predictions.length === 0) {
+                resultsGrid.innerHTML = '<div class="result-item">No faces detected</div>';
+                return;
+            }
+            
+            predictions.forEach((prediction, index) => {
+                const probability = (prediction.probability[0] * 100).toFixed(1);
+                const [x, y, width, height] = prediction.boundingBox;
+                
+                const resultItem = document.createElement('div');
+                resultItem.className = 'result-item';
+                resultItem.innerHTML = `
+                    <div><span class="result-label">Face ${index + 1}:</span> ${probability}% confidence</div>
+                    <div><span class="result-label">Position:</span> X: ${Math.round(x)}, Y: ${Math.round(y)}</div>
+                    <div><span class="result-label">Size:</span> ${Math.round(width)} × ${Math.round(height)} px</div>
+                    <div><span class="result-label">Landmarks:</span> ${prediction.scaledMesh.length} points</div>
+                `;
+                
+                resultsGrid.appendChild(resultItem);
+            });
+        }
+
+        // Handle image upload
+        function handleImageUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = async function() {
+                    // Set canvas dimensions to match image
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    
+                    // Draw image on canvas
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    
+                    // Detect faces
+                    statusEl.textContent = 'Detecting faces in uploaded image...';
+                    loadingEl.style.display = 'block';
+                    
+                    try {
+                        const predictions = await model.estimateFaces({
+                            input: canvas,
+                            returnTensors: false,
+                            flipHorizontal: false,
+                            predictIrises: false
+                        });
+                        
+                        // Draw detections
+                        drawDetections(predictions);
+                        
+                        // Update results
+                        updateResults(predictions);
+                        
+                        statusEl.textContent = `Detection complete. Found ${predictions.length} face(s).`;
+                    } catch (error) {
+                        statusEl.textContent = 'Error detecting faces: ' + error.message;
+                        console.error(error);
+                    } finally {
+                        loadingEl.style.display = 'none';
+                    }
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // Event listeners
+        startWebcamBtn.addEventListener('click', startWebcam);
+        stopWebcamBtn.addEventListener('click', stopWebcam);
+        fileInput.addEventListener('change', handleImageUpload);
+
+        // Initialize the app
+        init();
+    </script> 
+ 
+</body></html>
