@@ -1,2 +1,2 @@
 # face-detection
-face detection in html css ana javasript
+face detection in html css and javasript
